@@ -2,15 +2,16 @@ import { generateText } from 'ai';
 import { input, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { getDiff, commit } from '../git.js';
-import { loadConfig, getModel } from '../config.js';
+import { loadConfig, getModel, languageInstruction } from '../config.js';
 
-const SYSTEM = `You are an expert at writing git commit messages.
+const SYSTEM = (language: string) => `You are an expert at writing git commit messages.
 Rules:
 - Use conventional commits format: type(scope): description
 - First line max 72 characters
 - Be specific and meaningful — no "updated files" or "fixed stuff"
 - If there are multiple logical changes, list them in the body
-- Respond with ONLY the commit message, nothing else`;
+- Respond with ONLY the commit message, nothing else
+- ${languageInstruction(language)}`;
 
 const AI_TIMEOUT_MS = 30_000;
 
@@ -32,7 +33,7 @@ export async function commitCommand(): Promise<void> {
 
   const { text } = await generateText({
     model: getModel(config),
-    system: SYSTEM,
+    system: SYSTEM(config.language),
     prompt: `Generate a commit message for this diff:\n\n${diff}`,
     abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
   });

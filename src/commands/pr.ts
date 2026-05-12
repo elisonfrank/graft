@@ -3,9 +3,9 @@ import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { spawnSync } from 'child_process';
 import { getCommitLog, getCurrentBranch } from '../git.js';
-import { loadConfig, getModel } from '../config.js';
+import { loadConfig, getModel, languageInstruction } from '../config.js';
 
-const SYSTEM = `You are an expert at writing pull request descriptions.
+const SYSTEM = (language: string) => `You are an expert at writing pull request descriptions.
 Rules:
 - Write a clear title (max 72 chars)
 - Write a concise summary of what changed and why
@@ -13,7 +13,8 @@ Rules:
 - Add a "## How to test" section if relevant
 - Be direct — no filler phrases
 - Format: markdown
-- Respond with ONLY the PR title on the first line, then a blank line, then the body`;
+- Respond with ONLY the PR title on the first line, then a blank line, then the body
+- ${languageInstruction(language)}`;
 
 const AI_TIMEOUT_MS = 30_000;
 
@@ -31,7 +32,7 @@ export async function prCommand(base = 'main'): Promise<void> {
 
   const { text } = await generateText({
     model: getModel(config),
-    system: SYSTEM,
+    system: SYSTEM(config.language),
     prompt: `Generate a PR title and description for this branch (${branch}) based on these commits:\n\n${log}`,
     abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
   });

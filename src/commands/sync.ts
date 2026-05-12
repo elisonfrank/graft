@@ -3,7 +3,7 @@ import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { execSync, spawnSync } from 'child_process';
 import { readFileSync, writeFileSync } from 'fs';
-import { loadConfig, getModel } from '../config.js';
+import { loadConfig, getModel, languageInstruction } from '../config.js';
 import { getCurrentBranch } from '../git.js';
 
 const AI_TIMEOUT_MS = 60_000;
@@ -99,7 +99,8 @@ For each conflict block, produce the correct merged result.
 - Preserve both changes when they are complementary
 - Choose the better version when they are contradictory
 - Respond with a JSON array, one object per conflict block, in order:
-  [{ "index": 0, "resolved": "<merged code>", "explanation": "<one line why>" }, ...]`,
+  [{ "index": 0, "resolved": "<merged code>", "explanation": "<one line why>" }, ...]
+- ${languageInstruction(config.language)}`,
     prompt: `File: ${filePath}
 
 ${conflicts

@@ -17,6 +17,7 @@ export interface GraftConfig {
   provider: Provider;
   model: string;
   apiKey: string;
+  language: string;
 }
 
 const DEFAULTS: Record<Provider, string> = {
@@ -41,6 +42,10 @@ function isValidConfig(c: unknown): c is GraftConfig {
   );
 }
 
+export function languageInstruction(language: string): string {
+  return `Respond in ${language}.`;
+}
+
 export function loadConfig(): GraftConfig {
   if (fs.existsSync(CONFIG_PATH)) {
     try {
@@ -56,8 +61,9 @@ export function loadConfig(): GraftConfig {
     : 'openai';
   const model = process.env['GRAFT_MODEL'] ?? DEFAULTS[provider];
   const apiKey = process.env['GRAFT_API_KEY'] ?? process.env['OPENAI_API_KEY'] ?? '';
+  const language = process.env['GRAFT_LANGUAGE'] ?? 'English';
 
-  return { provider, model, apiKey };
+  return { provider, model, apiKey, language };
 }
 
 export function saveConfig(config: GraftConfig): void {
