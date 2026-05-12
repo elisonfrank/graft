@@ -5,12 +5,15 @@ import { prCommand } from './commands/pr.js';
 import { configCommand } from './commands/config.js';
 import { syncCommand } from './commands/sync.js';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { version } = require('../package.json') as { version: string };
+
 const program = new Command();
 
 program
   .name('graft')
   .description('AI-powered git workflow — commit messages and PR descriptions that actually make sense')
-  .version('0.1.0');
+  .version(version);
 
 program
   .command('commit')
