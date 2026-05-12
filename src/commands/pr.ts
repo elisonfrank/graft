@@ -1,7 +1,7 @@
 import { generateText } from 'ai';
 import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { getCommitLog, getCurrentBranch } from '../git.js';
 import { loadConfig, getModel } from '../config.js';
 
@@ -14,6 +14,8 @@ Rules:
 - Be direct — no filler phrases
 - Format: markdown
 - Respond with ONLY the PR title on the first line, then a blank line, then the body`;
+
+const AI_TIMEOUT_MS = 30_000;
 
 export async function prCommand(base = 'main'): Promise<void> {
   const log = getCommitLog(base);
@@ -31,31 +33,35 @@ export async function prCommand(base = 'main'): Promise<void> {
     model: getModel(config),
     system: SYSTEM,
     prompt: `Generate a PR title and description for this branch (${branch}) based on these commits:\n\n${log}`,
+    abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
   });
 
   const lines = text.trim().split('\n');
-  const title = lines[0]?.trim() ?? branch;
-  const body = lines.slice(2).join('\n').trim();
+  const title = (lines[0]?.trim() || branch).slice(0, 72);
+  const bodyStart = lines.findIndex((l, i) => i > 0 && l.trim() !== '');
+  const body = bodyStart > 0 ? lines.slice(bodyStart).join('\n').trim() : '';
 
   console.log('\n' + chalk.bold('PR Title:'));
   console.log(chalk.cyan(title));
-  console.log('\n' + chalk.bold('PR Body:'));
-  console.log(chalk.dim(body));
+
+  if (body) {
+    console.log('\n' + chalk.bold('PR Body:'));
+    console.log(chalk.dim(body));
+  }
 
   const approved = await confirm({ message: 'Open PR with this description?', default: true });
-
   if (!approved) return;
 
-  try {
-    const escapedTitle = title.replace(/"/g, '\\"');
-    const escapedBody = body.replace(/"/g, '\\"');
-    execSync(`gh pr create --title "${escapedTitle}" --body "${escapedBody}" --base ${base}`, {
-      stdio: 'inherit',
-    });
-  } catch {
-    console.log(chalk.red('GitHub CLI (gh) not found or not authenticated.'));
+  const result = spawnSync('gh', ['pr', 'create', '--title', title, '--body', body || title, '--base', base], {
+    stdio: 'inherit',
+    encoding: 'utf-8',
+  });
+
+  if (result.status !== 0) {
+    console.log(chalk.red('\nGitHub CLI (gh) not found or not authenticated.'));
     console.log(chalk.dim('Install it at: https://cli.github.com'));
-    console.log('\n' + chalk.bold('Copy the PR body manually:'));
-    console.log(body);
+    console.log('\n' + chalk.bold('Copy the PR description manually:'));
+    console.log(`Title: ${title}`);
+    if (body) console.log(`\n${body}`);
   }
 }

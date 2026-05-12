@@ -12,6 +12,8 @@ Rules:
 - If there are multiple logical changes, list them in the body
 - Respond with ONLY the commit message, nothing else`;
 
+const AI_TIMEOUT_MS = 30_000;
+
 export async function commitCommand(): Promise<void> {
   const diff = getDiff();
 
@@ -32,6 +34,7 @@ export async function commitCommand(): Promise<void> {
     model: getModel(config),
     system: SYSTEM,
     prompt: `Generate a commit message for this diff:\n\n${diff}`,
+    abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
   });
 
   const suggestion = text.trim();

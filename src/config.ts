@@ -9,27 +9,53 @@ import * as os from 'os';
 
 const CONFIG_PATH = path.join(os.homedir(), '.graft', 'config.json');
 
+const VALID_PROVIDERS = ['openai', 'anthropic', 'google', 'groq'] as const;
+
+export type Provider = (typeof VALID_PROVIDERS)[number];
+
 export interface GraftConfig {
-  provider: 'openai' | 'anthropic' | 'google' | 'groq';
+  provider: Provider;
   model: string;
   apiKey: string;
 }
 
-const DEFAULTS: Record<GraftConfig['provider'], string> = {
+const DEFAULTS: Record<Provider, string> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-haiku-4-5-20251001',
   google: 'gemini-2.0-flash',
   groq: 'llama-3.3-70b-versatile',
 };
 
+function isValidProvider(p: unknown): p is Provider {
+  return VALID_PROVIDERS.includes(p as Provider);
+}
+
+function isValidConfig(c: unknown): c is GraftConfig {
+  if (typeof c !== 'object' || c === null) return false;
+  const obj = c as Record<string, unknown>;
+  return (
+    isValidProvider(obj['provider']) &&
+    typeof obj['model'] === 'string' &&
+    obj['model'].length > 0 &&
+    typeof obj['apiKey'] === 'string'
+  );
+}
+
 export function loadConfig(): GraftConfig {
   if (fs.existsSync(CONFIG_PATH)) {
-    return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+    try {
+      const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+      if (isValidConfig(raw)) return raw;
+    } catch {
+      // fall through to env vars
+    }
   }
 
-  const provider = (process.env.GRAFT_PROVIDER ?? 'openai') as GraftConfig['provider'];
-  const model = process.env.GRAFT_MODEL ?? DEFAULTS[provider] ?? DEFAULTS.openai;
-  const apiKey = process.env.GRAFT_API_KEY ?? process.env.OPENAI_API_KEY ?? '';
+  const provider = isValidProvider(process.env['GRAFT_PROVIDER'])
+    ? process.env['GRAFT_PROVIDER']
+    : 'openai';
+  const model = process.env['GRAFT_MODEL'] ?? DEFAULTS[provider];
+  const apiKey = process.env['GRAFT_API_KEY'] ?? process.env['OPENAI_API_KEY'] ?? '';
 
   return { provider, model, apiKey };
 }
@@ -49,7 +75,5 @@ export function getModel(config: GraftConfig): LanguageModel {
       return createGoogleGenerativeAI({ apiKey: config.apiKey })(config.model);
     case 'groq':
       return createGroq({ apiKey: config.apiKey })(config.model);
-    default:
-      throw new Error(`Provider not supported: ${config.provider}`);
   }
 }
