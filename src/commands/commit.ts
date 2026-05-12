@@ -1,5 +1,5 @@
 import { generateText } from 'ai';
-import { input, confirm } from '@inquirer/prompts';
+import { input, confirm, select } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { getDiff, commit } from '../git.js';
 import { loadConfig, getModel, languageInstruction } from '../config.js';
@@ -48,6 +48,19 @@ export async function commitCommand(): Promise<void> {
   if (approved) {
     commit(suggestion);
     console.log(chalk.green('Committed!'));
+    return;
+  }
+
+  const action = await select<'edit' | 'cancel'>({
+    message: 'What now?',
+    choices: [
+      { value: 'edit', name: 'Edit the message' },
+      { value: 'cancel', name: 'Cancel' },
+    ],
+  });
+
+  if (action === 'cancel') {
+    console.log(chalk.dim('Cancelled.'));
     return;
   }
 

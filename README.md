@@ -10,12 +10,13 @@ You finished the implementation. Now comes the annoying part: writing a meaningf
 
 - `graft commit` — analyzes your diff and suggests a commit message in conventional commits format
 - `graft pr` — generates a PR title and description from your branch commits
-- `graft config` — configure your AI provider, model, and API key
+- `graft sync` — syncs with the base branch and resolves merge conflicts with AI
+- `graft config` — configure your AI provider, model, language, and API key
 
 ## Install
 
 ```bash
-npm install -g graft
+npm install -g graftai
 ```
 
 ## Setup
@@ -68,6 +69,22 @@ To compare against a different base branch:
 
 ```bash
 graft pr --base develop
+```
+
+### Sync
+
+When your branch has diverged from main:
+
+```bash
+graft sync
+```
+
+Graft detects whether to use merge or rebase, runs it, and resolves conflicts file by file with AI — showing the proposed resolution and explanation before applying.
+
+To sync against a different base branch:
+
+```bash
+graft sync --base develop
 ```
 
 ## How it works
