@@ -1,12 +1,46 @@
 import { execSync } from 'child_process';
 
+const EXCLUDED_PATTERNS = [
+  /^package-lock\.json$/,
+  /^yarn\.lock$/,
+  /^pnpm-lock\.yaml$/,
+  /^bun\.lockb$/,
+  /\.lock$/,
+  /^dist\//,
+  /^build\//,
+  /^\.next\//,
+];
+
+function isExcluded(file: string): boolean {
+  return EXCLUDED_PATTERNS.some((p) => p.test(file));
+}
+
+function getChangedFiles(staged: boolean): string[] {
+  const cmd = staged ? 'git diff --cached --name-only' : 'git diff HEAD --name-only';
+  return execSync(cmd, { encoding: 'utf-8' })
+    .split('\n')
+    .map((f) => f.trim())
+    .filter((f) => f.length > 0 && !isExcluded(f));
+}
+
 export function getDiff(): string {
   try {
-    let diff = execSync('git diff --cached', { encoding: 'utf-8' });
-    if (!diff.trim()) {
-      diff = execSync('git diff HEAD', { encoding: 'utf-8' });
+    let files = getChangedFiles(true);
+    let staged = true;
+
+    if (files.length === 0) {
+      files = getChangedFiles(false);
+      staged = false;
     }
-    return diff;
+
+    if (files.length === 0) {
+      return '';
+    }
+
+    const cmd = staged ? 'git diff --cached' : 'git diff HEAD';
+    return execSync(`${cmd} -- ${files.map((f) => JSON.stringify(f)).join(' ')}`, {
+      encoding: 'utf-8',
+    });
   } catch {
     throw new Error('Not a git repository or no changes found.');
   }

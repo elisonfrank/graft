@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { commitCommand } from './commands/commit.js';
 import { prCommand } from './commands/pr.js';
 import { configCommand } from './commands/config.js';
+import { syncCommand } from './commands/sync.js';
 
 const program = new Command();
 
@@ -21,6 +22,12 @@ program
   .description('Generate a PR title and description from your branch commits')
   .option('-b, --base <branch>', 'Base branch to compare against', 'main')
   .action((opts: { base: string }) => prCommand(opts.base));
+
+program
+  .command('sync')
+  .description('Sync with base branch — AI resolves merge conflicts automatically')
+  .option('-b, --base <branch>', 'Base branch to sync against', 'main')
+  .action((opts: { base: string }) => syncCommand(opts.base));
 
 program
   .command('config')
