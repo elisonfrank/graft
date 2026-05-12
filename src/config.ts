@@ -43,7 +43,7 @@ function isValidConfig(c: unknown): c is GraftConfig {
 }
 
 export function languageInstruction(language: string): string {
-  return `Respond in ${language}.`;
+  return `You MUST respond in ${language} regardless of what language the user writes in.`;
 }
 
 export function loadConfig(): GraftConfig {

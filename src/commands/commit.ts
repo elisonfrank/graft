@@ -12,6 +12,7 @@ Rules:
 - Be specific and meaningful — no "updated files" or "fixed stuff"
 - If there are multiple logical changes, list them in the body
 - Respond with ONLY the commit message, nothing else
+- The user may provide additional context in any language, but the commit message MUST be in ${language}
 - ${languageInstruction(language)}`;
 
 const AI_TIMEOUT_MS = 30_000;
@@ -60,48 +61,79 @@ export async function commitCommand(): Promise<void> {
     }
   }
 
+  let context: string | undefined;
+
   console.log(chalk.dim('\nAnalyzing diff...'));
 
-  const { text } = await generateText({
+  let { text } = await generateText({
     model: getModel(config),
     system: SYSTEM(config.language),
     prompt: `Generate a commit message for this diff:\n\n${diff}`,
     abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
   });
 
-  const suggestion = text.trim();
+  let suggestion = text.trim();
 
-  console.log('\n' + chalk.bold('Suggested commit message:'));
-  console.log(chalk.cyan(suggestion));
+  while (true) {
+    console.log('\n' + chalk.bold('Suggested commit message:'));
+    console.log(chalk.cyan(suggestion));
 
-  const approved = await confirm({ message: 'Use this message?', default: true });
+    const approved = await confirm({ message: 'Use this message?', default: true });
 
-  if (approved) {
-    commit(suggestion);
-    console.log(chalk.green('Committed!'));
-    return;
-  }
+    if (approved) {
+      commit(suggestion);
+      console.log(chalk.green('Committed!'));
+      return;
+    }
 
-  const action = await select<'edit' | 'cancel'>({
-    message: 'What now?',
-    choices: [
-      { value: 'edit', name: 'Edit the message' },
-      { value: 'cancel', name: 'Cancel' },
-    ],
-  });
+    const action = await select<'regenerate' | 'edit' | 'cancel'>({
+      message: 'What now?',
+      choices: [
+        { value: 'regenerate', name: 'Regenerate with additional context' },
+        { value: 'edit', name: 'Edit the message' },
+        { value: 'cancel', name: 'Cancel' },
+      ],
+    });
 
-  if (action === 'cancel') {
-    console.log(chalk.dim('Cancelled.'));
-    return;
-  }
+    if (action === 'cancel') {
+      console.log(chalk.dim('Cancelled.'));
+      return;
+    }
 
-  const edited = await input({
-    message: 'Edit the message:',
-    default: suggestion,
-  });
+    if (action === 'edit') {
+      const edited = await input({
+        message: 'Edit the message:',
+        default: suggestion,
+      });
 
-  if (edited.trim()) {
-    commit(edited.trim());
-    console.log(chalk.green('Committed!'));
+      if (edited.trim()) {
+        commit(edited.trim());
+        console.log(chalk.green('Committed!'));
+      }
+
+      return;
+    }
+
+    const additionalContext = await input({
+      message: 'Additional context to clarify the commit message:',
+    });
+
+    if (!additionalContext.trim()) {
+      console.log(chalk.yellow('No context provided.'));
+      continue;
+    }
+
+    context = additionalContext.trim();
+
+    console.log(chalk.dim(`Regenerating with additional context...`));
+
+    ({ text } = await generateText({
+      model: getModel(config),
+      system: SYSTEM(config.language),
+      prompt: `Generate a commit message for this diff. Incorporate this into the message (in ${config.language}): ${context}\n\n${diff}`,
+      abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
+    }));
+
+    suggestion = text.trim();
   }
 }
