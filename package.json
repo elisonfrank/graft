@@ -1,6 +1,6 @@
 {
   "name": "graftai",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "AI-powered git workflow — commit messages and PR descriptions that actually make sense",
   "main": "dist/index.js",
   "bin": {
