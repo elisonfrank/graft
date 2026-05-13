@@ -1,6 +1,8 @@
 import { execSync } from 'child_process';
+import { existsSync, readFileSync, appendFileSync } from 'fs';
+import { join } from 'path';
 
-const EXCLUDED_PATTERNS = [
+const BUILTIN_EXCLUDED = [
   /^package-lock\.json$/,
   /^yarn\.lock$/,
   /^pnpm-lock\.yaml$/,
@@ -11,8 +13,39 @@ const EXCLUDED_PATTERNS = [
   /^\.next\//,
 ];
 
+function getGraftIgnorePatterns(): RegExp[] {
+  const ignoreFile = join(process.cwd(), '.graftignore');
+  if (!existsSync(ignoreFile)) return [];
+
+  return readFileSync(ignoreFile, 'utf-8')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith('#'))
+    .map((pattern) => {
+      const escaped = pattern
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+      return new RegExp(`^${escaped}`);
+    });
+}
+
 function isExcluded(file: string): boolean {
-  return EXCLUDED_PATTERNS.some((p) => p.test(file));
+  const custom = getGraftIgnorePatterns();
+  return [...BUILTIN_EXCLUDED, ...custom].some((p) => p.test(file));
+}
+
+export function addToGraftIgnore(pattern: string): void {
+  const ignoreFile = join(process.cwd(), '.graftignore');
+  const existing = existsSync(ignoreFile)
+    ? readFileSync(ignoreFile, 'utf-8')
+    : '';
+
+  if (existing.split('\n').some((l) => l.trim() === pattern)) {
+    return;
+  }
+
+  appendFileSync(ignoreFile, `${existing.endsWith('\n') || existing === '' ? '' : '\n'}${pattern}\n`);
 }
 
 function getChangedFiles(staged: boolean): string[] {
@@ -62,6 +95,18 @@ export function getCommitLog(base = 'main'): string {
 
 export function getCurrentBranch(): string {
   return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
+}
+
+export function getStagedFiles(): string[] {
+  return getChangedFiles(true);
+}
+
+export function getUnstagedFiles(): string[] {
+  return getChangedFiles(false);
+}
+
+export function stageAll(): void {
+  execSync('git add .', { stdio: 'pipe' });
 }
 
 export function commit(message: string): void {

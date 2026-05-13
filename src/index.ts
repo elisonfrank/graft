@@ -4,6 +4,8 @@ import { commitCommand } from './commands/commit.js';
 import { prCommand } from './commands/pr.js';
 import { configCommand } from './commands/config.js';
 import { syncCommand } from './commands/sync.js';
+import { reviewCommand } from './commands/review.js';
+import { ignoreCommand } from './commands/ignore.js';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { version } = require('../package.json') as { version: string };
@@ -33,8 +35,18 @@ program
   .action((opts: { base: string }) => syncCommand(opts.base));
 
 program
+  .command('review')
+  .description('Review your diff for bugs, security issues, and logic errors')
+  .action(reviewCommand);
+
+program
+  .command('ignore <pattern>')
+  .description('Add a pattern to .graftignore to exclude from diff analysis')
+  .action(ignoreCommand);
+
+program
   .command('config')
-  .description('Configure AI provider, model, and API key')
+  .description('Configure AI provider, model, language, and API key')
   .action(configCommand);
 
 program.parse();
