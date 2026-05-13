@@ -12,13 +12,14 @@ interface ReviewIssue {
   message: string;
 }
 
-const SYSTEM = (language: string) => `You are an expert code reviewer.
-Analyze the git diff and identify real issues only — no style or formatting comments.
-Focus on:
-- Bugs and logic errors
+const SYSTEM = (language: string) => `You are an expert code reviewer analyzing a git diff.
+Important: you are seeing ONLY the changed lines, not the full files. Do NOT report missing imports, undefined variables, or missing definitions — those likely exist in the unchanged parts of the files.
+
+Focus exclusively on:
+- Bugs and logic errors introduced by these changes
 - Security vulnerabilities (injection, exposed secrets, unsafe input handling)
-- Missing error handling at system boundaries
-- Obvious performance problems
+- Missing error handling at system boundaries (user input, external APIs)
+- Obvious performance problems introduced by these changes
 
 Respond with a JSON array of issues:
 [{ "severity": "critical"|"warning"|"suggestion", "file": "path/to/file", "line": 42, "message": "description" }]
@@ -57,28 +58,42 @@ function printIssues(issues: ReviewIssue[]): void {
   }
 }
 
-async function parseIssues(text: string): Promise<ReviewIssue[]> {
+function parseIssues(text: string): ReviewIssue[] {
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    console.log(chalk.yellow('Could not parse review response — skipping review.'));
+    return [];
+  }
   try {
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error('No JSON found');
     return JSON.parse(jsonMatch[0]);
   } catch {
+    console.log(chalk.yellow('Could not parse review response — skipping review.'));
     return [];
   }
 }
 
 // Returns true if there are critical issues
 export async function runReview(diff: string, config: GraftConfig): Promise<boolean> {
+  if (!diff.trim()) return false;
+
   console.log(chalk.dim('Reviewing diff...'));
 
-  const { text } = await generateText({
-    model: getModel(config),
-    system: SYSTEM(config.language),
-    prompt: `Review this diff:\n\n${diff}`,
-    abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
-  });
+  let text: string;
+  try {
+    const result = await generateText({
+      model: getModel(config),
+      system: SYSTEM(config.language),
+      prompt: `Review this diff:\n\n${diff}`,
+      abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
+    });
+    text = result.text;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.log(chalk.yellow(`Review timed out or failed (${message}) — skipping review.`));
+    return false;
+  }
 
-  const issues = await parseIssues(text);
+  const issues = parseIssues(text);
 
   if (issues.length === 0) {
     console.log(chalk.green('No issues found. Looks good!'));
@@ -116,6 +131,12 @@ export async function reviewCommand(): Promise<void> {
   }
 
   const diff = getDiff();
+
+  if (!diff.trim()) {
+    console.log(chalk.yellow('No diff content to review.'));
+    return;
+  }
+
   const hasCriticals = await runReview(diff, config);
 
   if (hasCriticals) {
