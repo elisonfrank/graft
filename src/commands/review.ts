@@ -3,6 +3,7 @@ import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { getDiff, getStagedFiles, getUnstagedFiles, stageAll } from '../git.js';
 import { loadConfig, getModel, languageInstruction } from '../config.js';
+import type { GraftConfig } from '../config.js';
 
 interface ReviewIssue {
   severity: 'critical' | 'warning' | 'suggestion';
@@ -39,6 +40,56 @@ const SEVERITY_LABEL: Record<ReviewIssue['severity'], string> = {
   suggestion: '◆ SUGGESTION',
 };
 
+function printIssues(issues: ReviewIssue[]): void {
+  const criticals = issues.filter((i) => i.severity === 'critical');
+  const warnings = issues.filter((i) => i.severity === 'warning');
+  const suggestions = issues.filter((i) => i.severity === 'suggestion');
+
+  console.log(`\n${chalk.bold(`Review — ${issues.length} issue(s) found:`)}`);
+  console.log(chalk.dim(`  ${criticals.length} critical  ${warnings.length} warning  ${suggestions.length} suggestion\n`));
+
+  for (const issue of [...criticals, ...warnings, ...suggestions]) {
+    const color = SEVERITY_COLOR[issue.severity];
+    const label = SEVERITY_LABEL[issue.severity];
+    const location = issue.line ? `${issue.file}:${issue.line}` : issue.file;
+    console.log(color(label) + chalk.dim(` ${location}`));
+    console.log(`  ${issue.message}\n`);
+  }
+}
+
+async function parseIssues(text: string): Promise<ReviewIssue[]> {
+  try {
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('No JSON found');
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    return [];
+  }
+}
+
+// Returns true if there are critical issues
+export async function runReview(diff: string, config: GraftConfig): Promise<boolean> {
+  console.log(chalk.dim('Reviewing diff...'));
+
+  const { text } = await generateText({
+    model: getModel(config),
+    system: SYSTEM(config.language),
+    prompt: `Review this diff:\n\n${diff}`,
+    abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
+  });
+
+  const issues = await parseIssues(text);
+
+  if (issues.length === 0) {
+    console.log(chalk.green('No issues found. Looks good!'));
+    return false;
+  }
+
+  printIssues(issues);
+  return issues.some((i) => i.severity === 'critical');
+}
+
+// Standalone command
 export async function reviewCommand(): Promise<void> {
   const staged = getStagedFiles();
   const unstaged = getUnstagedFiles();
@@ -65,47 +116,9 @@ export async function reviewCommand(): Promise<void> {
   }
 
   const diff = getDiff();
-  console.log(chalk.dim('Reviewing diff...'));
+  const hasCriticals = await runReview(diff, config);
 
-  const { text } = await generateText({
-    model: getModel(config),
-    system: SYSTEM(config.language),
-    prompt: `Review this diff:\n\n${diff}`,
-    abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
-  });
-
-  let issues: ReviewIssue[];
-  try {
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error('No JSON found');
-    issues = JSON.parse(jsonMatch[0]);
-  } catch {
-    console.log(chalk.red('Could not parse review response.'));
-    console.log(chalk.dim(text));
-    return;
-  }
-
-  if (issues.length === 0) {
-    console.log(chalk.green('\nNo issues found. Looks good!'));
-    return;
-  }
-
-  const criticals = issues.filter((i) => i.severity === 'critical');
-  const warnings = issues.filter((i) => i.severity === 'warning');
-  const suggestions = issues.filter((i) => i.severity === 'suggestion');
-
-  console.log(`\n${chalk.bold(`Review complete — ${issues.length} issue(s) found:`)}`);
-  console.log(chalk.dim(`  ${criticals.length} critical  ${warnings.length} warning  ${suggestions.length} suggestion\n`));
-
-  for (const issue of [...criticals, ...warnings, ...suggestions]) {
-    const color = SEVERITY_COLOR[issue.severity];
-    const label = SEVERITY_LABEL[issue.severity];
-    const location = issue.line ? `${issue.file}:${issue.line}` : issue.file;
-    console.log(color(`${label}`) + chalk.dim(` ${location}`));
-    console.log(`  ${issue.message}\n`);
-  }
-
-  if (criticals.length > 0) {
-    console.log(chalk.red('Critical issues found. Fix before committing.'));
+  if (hasCriticals) {
+    console.log(chalk.red('Fix critical issues before committing.'));
   }
 }

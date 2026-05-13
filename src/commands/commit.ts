@@ -3,6 +3,7 @@ import { input, confirm, select } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { getDiff, commit, getStagedFiles, getUnstagedFiles, stageAll } from '../git.js';
 import { loadConfig, getModel, languageInstruction } from '../config.js';
+import { runReview } from './review.js';
 
 const SYSTEM = (language: string) => `You are an expert at writing git commit messages.
 Rules:
@@ -45,7 +46,21 @@ export async function commitCommand(): Promise<void> {
   }
 
   const diff = getDiff();
-  console.log(chalk.dim('Analyzing diff...'));
+
+  // review step
+  const hasCriticals = await runReview(diff, config);
+  if (hasCriticals) {
+    const proceed = await confirm({
+      message: 'Critical issues found. Commit anyway?',
+      default: false,
+    });
+    if (!proceed) {
+      console.log(chalk.dim('Cancelled. Fix the issues and try again.'));
+      return;
+    }
+  }
+
+  console.log(chalk.dim('\nAnalyzing diff...'));
 
   const { text } = await generateText({
     model: getModel(config),

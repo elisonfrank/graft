@@ -1,6 +1,6 @@
 # graft
 
-AI-powered git workflow — commit messages and PR descriptions that actually make sense.
+AI-powered git workflow — commit messages, PR descriptions, code review, and merge conflict resolution.
 
 ## The problem
 
@@ -8,9 +8,11 @@ You finished the implementation. Now comes the annoying part: writing a meaningf
 
 ## What it does
 
-- `graft commit` — analyzes your diff and suggests a commit message in conventional commits format
+- `graft commit` — stages, reviews, and commits with an AI-generated message
 - `graft pr` — generates a PR title and description from your branch commits
 - `graft sync` — syncs with the base branch and resolves merge conflicts with AI
+- `graft review` — reviews your diff for bugs, security issues, and logic errors
+- `graft ignore <pattern>` — exclude files or folders from diff analysis
 - `graft config` — configure your AI provider, model, language, and API key
 
 ## Install
@@ -25,7 +27,7 @@ npm install -g graftai
 graft config
 ```
 
-You'll be prompted to choose a provider, model, and paste your API key. Supported providers:
+You'll be prompted to choose a provider, model, language, and paste your API key. Supported providers:
 
 | Provider | Models |
 |---|---|
@@ -40,20 +42,20 @@ Config is saved to `~/.graft/config.json`. You can also use environment variable
 GRAFT_PROVIDER=openai
 GRAFT_MODEL=gpt-4o-mini
 GRAFT_API_KEY=sk-...
+GRAFT_LANGUAGE=English
 ```
 
 ## Usage
 
 ### Commit
 
-Stage your changes and run:
-
 ```bash
-git add .
 graft commit
 ```
 
-Graft analyzes the diff, suggests a message, and you approve or edit it before committing.
+If nothing is staged, graft lists the changed files and asks to stage them. Then it reviews the diff for issues and generates a commit message for you to approve or edit.
+
+If critical issues are found during review, you'll be warned before committing.
 
 ### Pull Request
 
@@ -87,9 +89,34 @@ To sync against a different base branch:
 graft sync --base develop
 ```
 
+### Review
+
+```bash
+graft review
+```
+
+Analyzes your diff and reports issues in three levels:
+
+- `● CRITICAL` — bugs, security vulnerabilities, exposed secrets
+- `▲ WARNING` — missing error handling, logic problems
+- `◆ SUGGESTION` — obvious quality improvements
+
+Review also runs automatically inside `graft commit`.
+
+### Ignore
+
+Exclude files or patterns from all diff analysis:
+
+```bash
+graft ignore "*.generated.ts"
+graft ignore "src/migrations/"
+```
+
+Patterns are saved to `.graftignore` in your project root. Supports `*` and `?` wildcards.
+
 ## How it works
 
-Graft sends your git diff or commit log to the configured AI model and asks it to write a meaningful, specific message — not "updated files" or "fixed stuff". Lock files, build artifacts, and generated files are automatically excluded from the diff.
+Graft sends your git diff or commit log to the configured AI model. Lock files, build artifacts, and `.graftignore` patterns are automatically excluded from the diff.
 
 ## License
 
