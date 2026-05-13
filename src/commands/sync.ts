@@ -22,10 +22,26 @@ interface ConflictResolution {
   explanation: string;
 }
 
+function resolveBase(base: string): string {
+  if (base.includes('/')) return base;
+  try {
+    execSync(`git rev-parse --verify ${base}`, { stdio: 'pipe' });
+    const localAhead = execSync(`git rev-list --count origin/${base}..${base}`, { encoding: 'utf-8', stdio: 'pipe' }).trim();
+    if (parseInt(localAhead) > 0) return base;
+  } catch { /* fall through */ }
+  try {
+    execSync(`git rev-parse --verify origin/${base}`, { stdio: 'pipe' });
+    return `origin/${base}`;
+  } catch {
+    return base;
+  }
+}
+
 function hasDivergence(base: string): boolean {
   try {
-    const ahead = execSync(`git rev-list --count ${base}..HEAD`, { encoding: 'utf-8' }).trim();
-    const behind = execSync(`git rev-list --count HEAD..${base}`, { encoding: 'utf-8' }).trim();
+    const ref = resolveBase(base);
+    const ahead = execSync(`git rev-list --count ${ref}..HEAD`, { encoding: 'utf-8' }).trim();
+    const behind = execSync(`git rev-list --count HEAD..${ref}`, { encoding: 'utf-8' }).trim();
     return parseInt(ahead) > 0 && parseInt(behind) > 0;
   } catch {
     return false;
@@ -84,7 +100,7 @@ async function resolveFile(
   filePath: string,
   config: ReturnType<typeof loadConfig>
 ): Promise<boolean> {
-  const originalContent = readFileSync(filePath, 'utf-8');
+  const originalContent = readFileSync(filePath, 'utf-8').replace(/\r\n/g, '\n');
   const conflicts = parseConflicts(originalContent);
 
   if (conflicts.length === 0) return true;
@@ -179,7 +195,9 @@ export async function syncCommand(base = 'main'): Promise<void> {
     console.log(chalk.yellow(`Could not fetch ${base}. Continuing with local state.`));
   }
 
-  if (!hasDivergence(`origin/${base}`)) {
+  const baseRef = resolveBase(base);
+
+  if (!hasDivergence(base)) {
     console.log(chalk.green('No divergence detected. Branch is up to date.'));
     return;
   }
@@ -188,14 +206,14 @@ export async function syncCommand(base = 'main'): Promise<void> {
   const strategy = published ? 'merge' : 'rebase';
 
   console.log(chalk.dim(`Branch is ${published ? 'published → merge' : 'local only → rebase'}`));
-  console.log(chalk.bold(`Strategy: git ${strategy} origin/${base}`));
+  console.log(chalk.bold(`Strategy: git ${strategy} ${baseRef}`));
 
   const proceed = await confirm({ message: 'Proceed?', default: true });
   if (!proceed) return;
 
   const result = spawnSync(
     'git',
-    strategy === 'rebase' ? ['rebase', `origin/${base}`] : ['merge', `origin/${base}`],
+    strategy === 'rebase' ? ['rebase', baseRef] : ['merge', baseRef],
     { encoding: 'utf-8', stdio: 'pipe' }
   );
 
