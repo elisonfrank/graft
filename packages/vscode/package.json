@@ -1,0 +1,108 @@
+{
+  "name": "graft-vscode",
+  "displayName": "Graft",
+  "description": "AI-powered git workflow — commit messages and PR descriptions that actually make sense",
+  "version": "0.1.0",
+  "publisher": "elisonfrank",
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "keywords": ["git", "ai", "commit", "pull-request", "copilot"],
+  "icon": "icon.png",
+  "repository": { "type": "git", "url": "https://github.com/elisonfrank/graft" },
+  "license": "MIT",
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "graft.commit",
+        "title": "Generate Commit Message",
+        "category": "Graft",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "graft.pr",
+        "title": "Generate PR Description",
+        "category": "Graft",
+        "icon": "$(git-pull-request)"
+      },
+      {
+        "command": "graft.review",
+        "title": "Review Changes",
+        "category": "Graft",
+        "icon": "$(eye)"
+      }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "graft.commit",
+          "group": "navigation@1",
+          "when": "scmProvider == git"
+        },
+        {
+          "command": "graft.pr",
+          "group": "navigation@2",
+          "when": "scmProvider == git"
+        },
+        {
+          "command": "graft.review",
+          "group": "navigation@3",
+          "when": "scmProvider == git"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Graft",
+      "properties": {
+        "graft.aiProvider": {
+          "type": "string",
+          "enum": ["copilot", "anthropic", "openai", "groq", "google"],
+          "enumDescriptions": [
+            "GitHub Copilot — no API key needed",
+            "Anthropic (Claude)",
+            "OpenAI (GPT)",
+            "Groq — fast & free tier available",
+            "Google (Gemini)"
+          ],
+          "default": "copilot",
+          "description": "AI provider. Uses ~/.graft/config.json if already configured via CLI."
+        },
+        "graft.model": {
+          "type": "string",
+          "enum": [
+            "",
+            "gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1",
+            "claude-haiku", "claude-sonnet", "claude-opus",
+            "gemini-2.0-flash", "gemini-2.5-pro",
+            "llama-3.3-70b", "llama-3.1-8b", "mixtral-8x7b"
+          ],
+          "default": "",
+          "description": "Model to use. Leave empty to use the provider default."
+        },
+        "graft.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key (not needed when using Copilot or if ~/.graft/config.json exists)."
+        },
+        "graft.language": {
+          "type": "string",
+          "enum": ["English", "Portuguese", "Spanish", "French", "German", "Italian", "Japanese", "Chinese", "Korean"],
+          "default": "English",
+          "description": "Language for generated commit messages and PR descriptions."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -p ./ --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "@vscode/vsce": "^3.0.0"
+  }
+}
