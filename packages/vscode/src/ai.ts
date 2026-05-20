@@ -41,16 +41,26 @@ function loadCliConfig(): GraftConfig | null {
 }
 
 function getEffectiveConfig(): { provider: string; apiKey: string; model?: string } {
-    // CLI config takes priority — no need to reconfigure if already set up
+    const vs = vscode.workspace.getConfiguration('graft');
+    const vsProvider = vs.inspect<string>('aiProvider');
+    const vsApiKey = vs.inspect<string>('apiKey');
+
+    // VS Code settings take priority if explicitly set by the user
+    const userSetProvider = vsProvider?.globalValue ?? vsProvider?.workspaceValue;
+    const userSetApiKey = vsApiKey?.globalValue ?? vsApiKey?.workspaceValue;
+    if (userSetProvider || userSetApiKey) {
+        return {
+            provider: userSetProvider ?? 'copilot',
+            apiKey: userSetApiKey ?? '',
+            model: vs.get<string>('model', '') || undefined,
+        };
+    }
+
+    // Otherwise fall back to CLI config
     const cli = loadCliConfig();
     if (cli?.apiKey) return cli;
 
-    const vs = vscode.workspace.getConfiguration('graft');
-    return {
-        provider: vs.get<string>('aiProvider', 'copilot'),
-        apiKey: vs.get<string>('apiKey', ''),
-        model: vs.get<string>('model', '') || undefined,
-    };
+    return { provider: 'copilot', apiKey: '' };
 }
 
 export function getLanguage(): string {
@@ -73,9 +83,12 @@ export async function generate(systemPrompt: string, userPrompt: string): Promis
 }
 
 async function generateWithCopilot(systemPrompt: string, userPrompt: string): Promise<string> {
-    const models = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+    let models = await vscode.lm.selectChatModels({ vendor: 'copilot' });
     if (models.length === 0) {
-        throw new Error('GitHub Copilot not available. Install the Copilot extension or run "graft config" to set an API key.');
+        models = await vscode.lm.selectChatModels({});
+    }
+    if (models.length === 0) {
+        throw new Error('No AI model available. Install GitHub Copilot Chat, or set graft.aiProvider and graft.apiKey in VS Code Settings.');
     }
     const model = models[0];
     const messages = [vscode.LanguageModelChatMessage.User(systemPrompt + '\n\n' + userPrompt)];

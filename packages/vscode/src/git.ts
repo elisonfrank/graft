@@ -35,11 +35,20 @@ export function getRepo(): Repository | undefined {
 }
 
 export async function getStagedDiff(): Promise<string> {
-    const repo = getRepo();
-    if (!repo) throw new Error('No git repository found.');
-    const diff = await repo.diff(true);
-    if (!diff.trim()) return repo.diff(false);
-    return diff;
+    const cwd = getCwd();
+    try {
+        const staged = execSync('git diff --cached', { encoding: 'utf-8', cwd }).trim();
+        if (staged) return staged;
+        const unstaged = execSync('git diff', { encoding: 'utf-8', cwd }).trim();
+        return unstaged;
+    } catch {
+        // fallback to VS Code git API
+        const repo = getRepo();
+        if (!repo) throw new Error('No git repository found.');
+        const diff = await repo.diff(true);
+        if (!diff.trim()) return repo.diff(false);
+        return diff;
+    }
 }
 
 export function getDefaultBranch(): string {

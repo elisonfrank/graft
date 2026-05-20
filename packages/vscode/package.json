@@ -1,8 +1,8 @@
 {
-  "name": "graft-vscode",
-  "displayName": "Graft",
+  "name": "graft-ai",
+  "displayName": "Graft AI - Git Workflow",
   "description": "AI-powered git workflow — commit messages and PR descriptions that actually make sense",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "publisher": "elisonfrank",
   "engines": { "vscode": "^1.90.0" },
   "categories": ["Other"],

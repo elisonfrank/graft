@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 256px; height: 256px; overflow: hidden; background: #000; }
+  </style>
+</head>
+<body>
+<canvas id="c" width="256" height="256"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const S = 256;
+
+// Background
+const bg = ctx.createLinearGradient(0, 0, S, S);
+bg.addColorStop(0, '#0f0c29');
+bg.addColorStop(0.5, '#1a1040');
+bg.addColorStop(1, '#16213e');
+ctx.fillStyle = bg;
+roundRect(ctx, 0, 0, S, S, 48);
+ctx.fill();
+
+// Subtle glow in center
+const glow = ctx.createRadialGradient(128, 128, 0, 128, 128, 100);
+glow.addColorStop(0, 'rgba(139, 92, 246, 0.18)');
+glow.addColorStop(1, 'rgba(0,0,0,0)');
+ctx.fillStyle = glow;
+ctx.fillRect(0, 0, S, S);
+
+// Git branch geometry
+// Main node (bottom center)
+const mainX = 128, mainY = 190;
+// Branch node (top left)
+const branchX = 82, branchY = 100;
+// Feature node (top right)
+const featureX = 174, featureY = 100;
+// Top commit (above branch node)
+const topX = 82, topY = 60;
+
+const lineW = 7;
+const nodeR = 14;
+const mainR = 18;
+
+// Lines
+ctx.lineCap = 'round';
+ctx.lineWidth = lineW;
+
+// main → branch
+const g1 = ctx.createLinearGradient(mainX, mainY, branchX, branchY);
+g1.addColorStop(0, '#8b5cf6');
+g1.addColorStop(1, '#a78bfa');
+ctx.strokeStyle = g1;
+ctx.beginPath(); ctx.moveTo(mainX, mainY); ctx.lineTo(branchX, branchY); ctx.stroke();
+
+// main → feature
+const g2 = ctx.createLinearGradient(mainX, mainY, featureX, featureY);
+g2.addColorStop(0, '#8b5cf6');
+g2.addColorStop(1, '#60a5fa');
+ctx.strokeStyle = g2;
+ctx.beginPath(); ctx.moveTo(mainX, mainY); ctx.lineTo(featureX, featureY); ctx.stroke();
+
+// branch → top
+ctx.strokeStyle = '#a78bfa';
+ctx.beginPath(); ctx.moveTo(branchX, branchY); ctx.lineTo(topX, topY); ctx.stroke();
+
+// Nodes
+function drawNode(x, y, r, color1, color2) {
+    const ng = ctx.createRadialGradient(x - r*0.3, y - r*0.3, 0, x, y, r);
+    ng.addColorStop(0, color1);
+    ng.addColorStop(1, color2);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = ng;
+    ctx.fill();
+}
+
+drawNode(topX, topY, nodeR, '#c4b5fd', '#8b5cf6');
+drawNode(branchX, branchY, nodeR, '#c4b5fd', '#7c3aed');
+drawNode(featureX, featureY, nodeR, '#93c5fd', '#3b82f6');
+
+// Main node — bigger, with sparkle glow
+const mainGlow = ctx.createRadialGradient(mainX, mainY, 0, mainX, mainY, 36);
+mainGlow.addColorStop(0, 'rgba(167, 139, 250, 0.35)');
+mainGlow.addColorStop(1, 'rgba(0,0,0,0)');
+ctx.fillStyle = mainGlow;
+ctx.beginPath(); ctx.arc(mainX, mainY, 36, 0, Math.PI*2); ctx.fill();
+
+drawNode(mainX, mainY, mainR, '#e9d5ff', '#8b5cf6');
+
+// Sparkle on main node (AI hint)
+drawSparkle(ctx, mainX, mainY, 9, '#fff');
+
+function drawSparkle(ctx, x, y, size, color) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = color;
+    for (let i = 0; i < 4; i++) {
+        ctx.save();
+        ctx.rotate(i * Math.PI / 2);
+        ctx.beginPath();
+        ctx.moveTo(0, -size);
+        ctx.quadraticCurveTo(size * 0.2, -size * 0.2, size * 0.35, 0);
+        ctx.quadraticCurveTo(size * 0.2, size * 0.2, 0, size);
+        ctx.quadraticCurveTo(-size * 0.2, size * 0.2, -size * 0.35, 0);
+        ctx.quadraticCurveTo(-size * 0.2, -size * 0.2, 0, -size);
+        ctx.fill();
+        ctx.restore();
+    }
+    ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+// Export button
+const btn = document.createElement('button');
+btn.textContent = 'Save PNG';
+btn.style.cssText = 'position:fixed;bottom:8px;left:50%;transform:translateX(-50%);padding:4px 12px;cursor:pointer;font-size:12px;';
+btn.onclick = () => {
+    const a = document.createElement('a');
+    a.download = 'icon.png';
+    a.href = c.toDataURL('image/png');
+    a.click();
+};
+document.body.appendChild(btn);
+</script>
+</body>
+</html>
